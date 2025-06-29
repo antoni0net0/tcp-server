@@ -132,17 +132,24 @@ def main():
     # Janela para pedir IP e porta
     ip_port_root = tk.Tk()
     ip_port_root.title("Conectar ao Servidor TCP")
-    ip_port_root.geometry("300x150")
+    ip_port_root.geometry("420x260")
+    ip_port_root.configure(bg="#222831")
 
-    tk.Label(ip_port_root, text="Endereço IP do Servidor:").pack(pady=5)
-    ip_entry = tk.Entry(ip_port_root)
+    title_label = tk.Label(ip_port_root, text="Cliente TCP", font=("Segoe UI", 18, "bold"), fg="#00adb5", bg="#222831")
+    title_label.pack(pady=(15, 5))
+
+    frame = tk.Frame(ip_port_root, bg="#222831")
+    frame.pack(pady=5)
+
+    tk.Label(frame, text="Endereço IP do Servidor:", fg="#eeeeee", bg="#222831", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w", pady=2)
+    ip_entry = tk.Entry(frame, font=("Segoe UI", 10), width=18)
     ip_entry.insert(0, "127.0.0.1")
-    ip_entry.pack(pady=2)
+    ip_entry.grid(row=0, column=1, pady=2, padx=5)
 
-    tk.Label(ip_port_root, text="Porta:").pack(pady=5)
-    port_entry = tk.Entry(ip_port_root)
+    tk.Label(frame, text="Porta:", fg="#eeeeee", bg="#222831", font=("Segoe UI", 10)).grid(row=1, column=0, sticky="w", pady=2)
+    port_entry = tk.Entry(frame, font=("Segoe UI", 10), width=8)
     port_entry.insert(0, "9999")
-    port_entry.pack(pady=2)
+    port_entry.grid(row=1, column=1, pady=2, padx=5, sticky="w")
 
     def conectar():
         ip = ip_entry.get()
@@ -164,21 +171,49 @@ def main():
         global root
         root = tk.Tk()
         root.title("Cliente TCP")
-        root.geometry("400x300")
+        root.geometry("600x480")
+        root.configure(bg="#222831")
 
-        sair_button = tk.Button(root, text="Sair", command=lambda: handle_sair(client_socket))
-        sair_button.pack(pady=10)
+        title = tk.Label(root, text="Cliente TCP", font=("Segoe UI", 18, "bold"), fg="#00adb5", bg="#222831")
+        title.pack(pady=(15, 5))
 
-        arquivo_button = tk.Button(root, text="Arquivo", command=lambda: handle_arquivo(client_socket))
-        arquivo_button.pack(pady=10)
+        button_frame = tk.Frame(root, bg="#222831")
+        button_frame.pack(pady=10)
 
-        chat_button = tk.Button(root, text="Chat", command=lambda: iniciar_chat(client_socket))
-        chat_button.pack(pady=10)
+        sair_button = tk.Button(button_frame, text="Sair", command=lambda: handle_sair(client_socket), font=("Segoe UI", 12), bg="#393e46", fg="#eeeeee", width=12, relief="flat", activebackground="#00adb5", activeforeground="#222831")
+        sair_button.grid(row=0, column=0, padx=10, pady=5)
+
+        arquivo_button = tk.Button(button_frame, text="Arquivo", command=lambda: handle_arquivo(client_socket), font=("Segoe UI", 12), bg="#393e46", fg="#eeeeee", width=12, relief="flat", activebackground="#00adb5", activeforeground="#222831")
+        arquivo_button.grid(row=0, column=1, padx=10, pady=5)
+
+        chat_button = tk.Button(button_frame, text="Chat", command=lambda: iniciar_chat(client_socket), font=("Segoe UI", 12), bg="#393e46", fg="#eeeeee", width=12, relief="flat", activebackground="#00adb5", activeforeground="#222831")
+        chat_button.grid(row=0, column=2, padx=10, pady=5)
+
+        # Área de log para feedback
+        log_frame = tk.Frame(root, bg="#222831")
+        log_frame.pack(pady=10)
+        log_label = tk.Label(log_frame, text="Log de Operações", font=("Segoe UI", 10, "bold"), fg="#00adb5", bg="#222831")
+        log_label.pack(anchor="w")
+        log_text = scrolledtext.ScrolledText(log_frame, state='disabled', width=80, height=18, font=("Consolas", 11), bg="#393e46", fg="#eeeeee", relief="flat")
+        log_text.pack()
+
+        # Redirecionar prints para o log
+        class PrintLogger:
+            def write(self, msg):
+                log_text.config(state='normal')
+                log_text.insert(tk.END, msg)
+                log_text.see(tk.END)
+                log_text.config(state='disabled')
+            def flush(self):
+                pass
+        import sys
+        sys.stdout = PrintLogger()
+        sys.stderr = PrintLogger()
 
         root.mainloop()
 
-    conectar_button = tk.Button(ip_port_root, text="Conectar", command=conectar)
-    conectar_button.pack(pady=10)
+    conectar_button = tk.Button(ip_port_root, text="Conectar", command=conectar, font=("Segoe UI", 12, "bold"), bg="#00adb5", fg="#222831", relief="flat", width=15)
+    conectar_button.pack(pady=18)
     ip_port_root.mainloop()
 
 if __name__ == "__main__":

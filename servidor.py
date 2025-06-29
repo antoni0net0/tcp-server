@@ -36,6 +36,11 @@ def handle_client(client_socket, client_address):
                 if not chat_window:
                     chat_window = ChatWindow(server_root, client_socket, client_address)
                 chat_window.display_message(f"Cliente {client_address}: {request[5:]}\n")
+                # Envia a mensagem recebida do cliente de volta para ele
+                try:
+                    client_socket.send(f"Chat {request[5:]}".encode('utf-8'))
+                except Exception as e:
+                    print(f"Erro ao enviar mensagem de volta para o cliente: {e}")
                     
         except ConnectionResetError:
             print(f"Conexão com {client_address} foi perdida.")
@@ -93,8 +98,15 @@ class ChatWindow:
 
     def send_message(self, event):
         mensagem = self.chat_entry.get()
-        self.client_socket.send(f"Chat {mensagem}".encode('utf-8'))
-        self.display_message(f"Você: {mensagem}\n")
+        if mensagem.strip() == '':
+            return
+        try:
+            # Envia para o cliente com prefixo Chat
+            self.client_socket.send(f"Chat {mensagem}".encode('utf-8'))
+            self.display_message(f"Você: {mensagem}\n")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao enviar mensagem: {e}")
+        self.chat_entry.delete(0, tk.END)
         if mensagem.lower() == 'sair':
             self.client_socket.send("Sair".encode('utf-8'))
             self.window.destroy()
@@ -136,15 +148,24 @@ def enviar_broadcast(event=None):
 if __name__ == "__main__":
     server_root = tk.Tk()
     server_root.title("Servidor TCP")
+    server_root.geometry("800x600")
+    server_root.configure(bg="#222831")
 
-    broadcast_frame = tk.Frame(server_root)
-    broadcast_frame.pack()
+    title = tk.Label(server_root, text="Servidor TCP", font=("Segoe UI", 22, "bold"), fg="#00adb5", bg="#222831")
+    title.pack(pady=(18, 8))
 
-    broadcast_log = scrolledtext.ScrolledText(broadcast_frame, state='disabled', width=50, height=20)
-    broadcast_log.pack()
+    broadcast_frame = tk.Frame(server_root, bg="#222831")
+    broadcast_frame.pack(pady=10)
 
-    broadcast_entry = tk.Entry(broadcast_frame, width=50)
-    broadcast_entry.pack()
+    broadcast_log = scrolledtext.ScrolledText(broadcast_frame, state='disabled', width=70, height=18, font=("Consolas", 11), bg="#393e46", fg="#eeeeee", relief="flat")
+    broadcast_log.pack(pady=5)
+
+    entry_frame = tk.Frame(broadcast_frame, bg="#222831")
+    entry_frame.pack(pady=5)
+    broadcast_entry = tk.Entry(entry_frame, width=55, font=("Segoe UI", 12), bg="#eeeeee", fg="#222831", relief="flat")
+    broadcast_entry.grid(row=0, column=0, padx=5)
+    send_btn = tk.Button(entry_frame, text="Enviar Broadcast", command=enviar_broadcast, font=("Segoe UI", 11, "bold"), bg="#00adb5", fg="#222831", relief="flat", width=18)
+    send_btn.grid(row=0, column=1, padx=5)
     broadcast_entry.bind("<Return>", enviar_broadcast)
 
     threading.Thread(target=start_server).start()
