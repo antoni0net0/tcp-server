@@ -3,7 +3,7 @@ import socket
 import threading
 import hashlib
 import tkinter as tk
-from tkinter import simpledialog, scrolledtext, messagebox
+from tkinter import filedialog, scrolledtext, messagebox
 
 def calcular_hash(arquivo):
     sha256 = hashlib.sha256()
@@ -92,12 +92,17 @@ class ChatWindow:
             self.window.destroy()
 
 def handle_arquivo(client_socket):
-    nome_arquivo = simpledialog.askstring("Arquivo", "Digite o nome do arquivo (com extensão):")
+    # Nova interface: seleção de arquivo
+    file_path = filedialog.askopenfilename(title="Selecione o arquivo para baixar do servidor",
+                                           filetypes=[("Todos os arquivos", "*.*")])
+    if not file_path:
+        return
+    nome_arquivo = os.path.basename(file_path)
     client_socket.send(f"Arquivo {nome_arquivo}".encode('utf-8'))
     resposta = client_socket.recv(1024).decode('utf-8')
     print(f"Resposta do Servidor: {resposta}")
     messagebox.showinfo("Resposta do Servidor", resposta)
-    
+
     if "Status: ok" in resposta:
         client_socket.send("Pronto para receber".encode('utf-8'))
 
@@ -105,14 +110,14 @@ def handle_arquivo(client_socket):
             novo_nome_arquivo = receber_arquivo(client_socket, nome_arquivo)
             hash_local = calcular_hash(novo_nome_arquivo)
             hash_remoto = resposta.split('Hash: ')[1].split('\n')[0]
-            
+
             if hash_local == hash_remoto:
                 print(f"Arquivo recebido com sucesso como {novo_nome_arquivo} e a integridade foi verificada.")
                 messagebox.showinfo("Arquivo", f"Arquivo recebido com sucesso como {novo_nome_arquivo} e a integridade foi verificada.")
             else:
                 print("Falha na verificação de integridade do arquivo.")
                 messagebox.showerror("Arquivo", "Falha na verificação de integridade do arquivo.")
-        
+
         threading.Thread(target=thread_receber_arquivo).start()
     else:
         messagebox.showerror("Arquivo", "Arquivo não encontrado no servidor.")
@@ -124,24 +129,57 @@ def handle_sair(client_socket):
 
 def main():
     global root
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect(('127.0.0.1', 9999))
-    print("Conectado ao servidor.")
+    # Janela para pedir IP e porta
+    ip_port_root = tk.Tk()
+    ip_port_root.title("Conectar ao Servidor TCP")
+    ip_port_root.geometry("300x150")
 
-    root = tk.Tk()
-    root.title("Cliente TCP")
-    root.geometry("400x300")
+    tk.Label(ip_port_root, text="Endereço IP do Servidor:").pack(pady=5)
+    ip_entry = tk.Entry(ip_port_root)
+    ip_entry.insert(0, "127.0.0.1")
+    ip_entry.pack(pady=2)
 
-    sair_button = tk.Button(root, text="Sair", command=lambda: handle_sair(client_socket))
-    sair_button.pack(pady=10)
+    tk.Label(ip_port_root, text="Porta:").pack(pady=5)
+    port_entry = tk.Entry(ip_port_root)
+    port_entry.insert(0, "9999")
+    port_entry.pack(pady=2)
 
-    arquivo_button = tk.Button(root, text="Arquivo", command=lambda: handle_arquivo(client_socket))
-    arquivo_button.pack(pady=10)
+    def conectar():
+        ip = ip_entry.get()
+        try:
+            port = int(port_entry.get())
+        except ValueError:
+            messagebox.showerror("Erro", "Porta inválida!")
+            return
+        try:
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.connect((ip, port))
+        except Exception as e:
+            messagebox.showerror("Erro", f"Não foi possível conectar: {e}")
+            return
+        ip_port_root.destroy()
+        print("Conectado ao servidor.")
 
-    chat_button = tk.Button(root, text="Chat", command=lambda: iniciar_chat(client_socket))
-    chat_button.pack(pady=10)
+        # Janela principal
+        global root
+        root = tk.Tk()
+        root.title("Cliente TCP")
+        root.geometry("400x300")
 
-    root.mainloop()
+        sair_button = tk.Button(root, text="Sair", command=lambda: handle_sair(client_socket))
+        sair_button.pack(pady=10)
+
+        arquivo_button = tk.Button(root, text="Arquivo", command=lambda: handle_arquivo(client_socket))
+        arquivo_button.pack(pady=10)
+
+        chat_button = tk.Button(root, text="Chat", command=lambda: iniciar_chat(client_socket))
+        chat_button.pack(pady=10)
+
+        root.mainloop()
+
+    conectar_button = tk.Button(ip_port_root, text="Conectar", command=conectar)
+    conectar_button.pack(pady=10)
+    ip_port_root.mainloop()
 
 if __name__ == "__main__":
     main()
