@@ -1,0 +1,94 @@
+Exercício 1)
+
+pré-ordem: A B D C E F
+
+in-ordem: B D A E C F
+
+pós-ordem: D B E F C A
+
+Exercício 2)
+
+função pré-ordem
+
+preOrdem(Arvore *a)
+{
+	if(a != NULL)
+	{
+		vista(a);
+		preOrdem(a->left);
+		preOrdem(a->right);
+	}	
+}
+
+inOrdem(Arvore *a)
+{
+	if(a != NULL)
+	{
+		preOrdem(a->left);
+		vista(a);
+		preOrdem(a->right);
+	}	
+}
+
+posOrdem(Arvore *a)
+{
+	if(a != NULL)
+	{
+		preOrdem(a->left);
+		preOrdem(a->right);
+		vista(a);		
+	}	
+}
+
+Exercício 3)
+
+int pertence_arv(Arvore *a, char c)
+{
+	if(a == NULL)
+	{
+		return 0;
+	}
+
+	if(a->dado == c)
+	{
+		return 1;
+	}	
+
+	return pertence_arv(no->esquerda, c) || pertence_arv(no->direita, c);
+}
+
+Exercício 4)
+
+int conta_nos (Arvore *a)
+{
+	if (a == NULL) 
+	{
+        	return 0;
+    	}
+	else
+	{
+      		int nos_esquerda = conta_nos(a->left);
+        	int nos_direita = conta_nos(a->right);
+        
+        	return 1 + nos_esquerda + nos_direita;
+    	}
+}
+		
+int calcula_altura_arvore (Arvore *a)
+{
+	int subArv = 0;
+
+	if (a == NULL) 
+	{
+        	return 0;
+    	}
+	else
+	{
+      		int alt_esquerda = calcula_altura_arvore(a->left);
+        	int alt_direita = calcula_altura_arvore(a->right);
+		
+		
+        
+        	return 1 + nos_esquerda + nos_direita;
+    	}
+}

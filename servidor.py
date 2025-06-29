@@ -5,6 +5,7 @@ import hashlib
 import tkinter as tk
 from tkinter import scrolledtext, simpledialog, messagebox
 import time  # Import time module
+import sys
 
 def calcular_hash(arquivo):
     sha256 = hashlib.sha256()
@@ -30,17 +31,14 @@ def handle_client(client_socket, client_address):
 
             elif request.startswith("Arquivo"):
                 parts = request.split(' ', 1)
-                threading.Thread(target=send_archive(parts,client_socket, client_address)).start()
+                threading.Thread(target=send_archive, args=(parts, client_socket, client_address)).start()
                             
             elif request.startswith("Chat"):
                 if not chat_window:
                     chat_window = ChatWindow(server_root, client_socket, client_address)
-                chat_window.display_message(f"Cliente {client_address}: {request[5:]}\n")
-                # Envia a mensagem recebida do cliente de volta para ele
-                try:
-                    client_socket.send(f"Chat {request[5:]}".encode('utf-8'))
-                except Exception as e:
-                    print(f"Erro ao enviar mensagem de volta para o cliente: {e}")
+                # Exibe a mensagem recebida na janela do chat
+                chat_window.display_message(f"Cliente: {request[5:]}\n")
+                # Não envie de volta para o cliente aqui!
                     
         except ConnectionResetError:
             print(f"Conexão com {client_address} foi perdida.")
@@ -80,6 +78,7 @@ class ChatWindow:
     def __init__(self, root, client_socket, client_address):
         self.client_socket = client_socket
         self.client_address = client_address
+        self.running = True
 
         self.window = tk.Toplevel(root)
         self.window.title(f"Chat com {client_address}")
@@ -91,17 +90,23 @@ class ChatWindow:
         self.chat_entry.pack()
         self.chat_entry.bind("<Return>", self.send_message)
 
+        # Thread para ouvir mensagens do cliente
+        self.listen_thread = threading.Thread(target=self.listen_for_messages, daemon=True)
+        self.listen_thread.start()
+
     def display_message(self, message):
-        self.chat_log.config(state='normal')
-        self.chat_log.insert(tk.END, message)
-        self.chat_log.config(state='disabled')
+        # Garante que a atualização do chat_log ocorra na thread principal do Tkinter
+        def update_log():
+            self.chat_log.config(state='normal')
+            self.chat_log.insert(tk.END, message)
+            self.chat_log.config(state='disabled')
+        self.window.after(0, update_log)
 
     def send_message(self, event):
         mensagem = self.chat_entry.get()
         if mensagem.strip() == '':
             return
         try:
-            # Envia para o cliente com prefixo Chat
             self.client_socket.send(f"Chat {mensagem}".encode('utf-8'))
             self.display_message(f"Você: {mensagem}\n")
         except Exception as e:
@@ -109,9 +114,26 @@ class ChatWindow:
         self.chat_entry.delete(0, tk.END)
         if mensagem.lower() == 'sair':
             self.client_socket.send("Sair".encode('utf-8'))
+            self.running = False
             self.window.destroy()
 
+    def listen_for_messages(self):
+        while self.running:
+            try:
+                data = self.client_socket.recv(1024).decode('utf-8')
+                if data.startswith("Chat "):
+                    mensagem = data[5:]
+                    self.display_message(f"Cliente: {mensagem}\n")
+                elif data.startswith("Sair"):
+                    self.display_message("Cliente saiu do chat.\n")
+                    self.running = False
+                    self.window.destroy()
+                    break
+            except Exception:
+                break
+
     def close_window(self):
+        self.running = False
         self.window.destroy()
 
 def broadcast_message(message):
@@ -145,6 +167,19 @@ def enviar_broadcast(event=None):
     broadcast_log.insert(tk.END, f"Você: {mensagem}\n")
     broadcast_log.config(state='disabled')
 
+def monitorar_parada():
+    while True:
+        comando = input()
+        if comando.strip() == "/s":
+            print("Encerrando servidor...")
+            for client in clients:
+                try:
+                    client.send("Sair".encode('utf-8'))
+                    client.close()
+                except:
+                    pass
+            os._exit(0)  # Encerra imediatamente o processo
+
 if __name__ == "__main__":
     server_root = tk.Tk()
     server_root.title("Servidor TCP")
@@ -169,4 +204,5 @@ if __name__ == "__main__":
     broadcast_entry.bind("<Return>", enviar_broadcast)
 
     threading.Thread(target=start_server).start()
+    threading.Thread(target=monitorar_parada, daemon=True).start()
     server_root.mainloop()
