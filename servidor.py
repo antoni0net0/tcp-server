@@ -14,9 +14,13 @@ def calcular_hash(arquivo):
             sha256.update(bloco)
     return sha256.hexdigest()
 
+
+# Use o endereço do cliente como chave para garantir unicidade por cliente
+chat_windows = {}
+
 def handle_client(client_socket, client_address):
     print(f"Conexão de {client_address} estabelecida.")
-    chat_window = None
+    global chat_windows
 
     buffer = ""
     while True:
@@ -31,15 +35,19 @@ def handle_client(client_socket, client_address):
                     continue
                 if request.startswith("Sair"):
                     print(f"Cliente {client_address} desconectado.")
+                    if client_address in chat_windows:
+                        chat_windows[client_address].display_message("Cliente saiu do chat.\n")
+                        chat_windows[client_address].close_window()
+                        del chat_windows[client_address]
                     return
                 elif request.startswith("Arquivo"):
                     parts = request.split(' ', 1)
                     threading.Thread(target=send_archive, args=(parts, client_socket, client_address)).start()
                 elif request.startswith("Chat"):
-                    if not chat_window:
-                        chat_window = ChatWindow(server_root, client_socket, client_address)
+                    if client_address not in chat_windows:
+                        chat_windows[client_address] = ChatWindow(server_root, client_socket, client_address)
                     # Exibe a mensagem recebida na janela do chat
-                    chat_window.display_message(f"Cliente: {request[5:]}\n")
+                    chat_windows[client_address].display_message(f"Cliente: {request[5:]}\n")
                     # Também exibe no log principal do servidor:
                     broadcast_log.config(state='normal')
                     broadcast_log.insert(tk.END, f"[Chat] {client_address}: {request[5:]}\n")
@@ -51,8 +59,9 @@ def handle_client(client_socket, client_address):
 
     client_socket.close()
     clients.remove(client_socket)
-    if chat_window:
-        chat_window.close_window()
+    if client_address in chat_windows:
+        chat_windows[client_address].close_window()
+        del chat_windows[client_address]
 def send_archive(parts, client_socket, client_address):
     if len(parts) == 2:
         nome_arquivo = parts[1]
@@ -157,18 +166,21 @@ def enviar_broadcast(event=None):
     broadcast_log.insert(tk.END, f"Você: {mensagem}\n")
     broadcast_log.config(state='disabled')
 
-def monitorar_parada():
-    while True:
-        comando = input()
-        if comando.strip() == "/s":
-            print("Encerrando servidor...")
-            for client in clients:
-                try:
-                    client.send("Sair".encode('utf-8'))
-                    client.close()
-                except:
-                    pass
-            os._exit(0)  # Encerra imediatamente o processo
+
+# Função para encerrar o servidor de forma limpa
+def sair_servidor():
+    print("Encerrando servidor...")
+    for client in clients:
+        try:
+            client.send("Sair".encode('utf-8'))
+            client.close()
+        except:
+            pass
+    try:
+        server_root.destroy()
+    except:
+        pass
+    os._exit(0)  # Encerra imediatamente o processo
 
 if __name__ == "__main__":
     server_root = tk.Tk()
@@ -193,6 +205,12 @@ if __name__ == "__main__":
     send_btn.grid(row=0, column=1, padx=5)
     broadcast_entry.bind("<Return>", enviar_broadcast)
 
+    # Botão Sair
+    sair_btn = tk.Button(server_root, text="Sair", command=sair_servidor, font=("Segoe UI", 12, "bold"), bg="#ff2e63", fg="#eeeeee", relief="flat", width=12)
+    sair_btn.pack(pady=10)
+
+    # Handler para fechar a janela
+    server_root.protocol("WM_DELETE_WINDOW", sair_servidor)
+
     threading.Thread(target=start_server).start()
-    threading.Thread(target=monitorar_parada, daemon=True).start()
     server_root.mainloop()
