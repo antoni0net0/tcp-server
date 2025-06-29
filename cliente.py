@@ -40,38 +40,14 @@ def receber_arquivo(client_socket, nome_arquivo):
     
     return novo_nome_arquivo
 
-def enviar_mensagens(chat_window):
-    while True:
-        mensagem = chat_window.chat_entry.get()
-        chat_window.chat_entry.delete(0, tk.END)
-        if mensagem.lower() == 'sair':
-            chat_window.client_socket.send("Sair".encode('utf-8'))
-            chat_window.window.destroy()
-            break
-        chat_window.client_socket.send(f"Chat {mensagem}".encode('utf-8'))
-        chat_window.chat_log.insert(tk.END, f"Você: {mensagem}\n")
 
-def receber_mensagens(chat_window):
-    while True:
-        resposta = chat_window.client_socket.recv(1024).decode('utf-8')
-        if not resposta:
-            break
-        if resposta.startswith("Chat "):
-            resposta = resposta[5:]
-        chat_window.chat_log.config(state='normal')
-        chat_window.chat_log.insert(tk.END, f"Servidor: {resposta}\n")
-        chat_window.chat_log.config(state='disabled')
-
-def iniciar_chat(client_socket):
-    chat_window = ChatWindow(client_socket)
-    receber_thread = threading.Thread(target=receber_mensagens, args=(chat_window,))
-    receber_thread.start()
 
 class ChatWindow:
-    def __init__(self, client_socket):
+    def __init__(self, client_socket, root):
         self.window = tk.Toplevel(root)
         self.window.title("Chat com Servidor")
         self.client_socket = client_socket
+        self.running = True
 
         self.chat_log = scrolledtext.ScrolledText(self.window, state='disabled', width=50, height=20)
         self.chat_log.pack()
@@ -80,16 +56,68 @@ class ChatWindow:
         self.chat_entry.pack()
         self.chat_entry.bind("<Return>", self.send_message)
 
+        # Fecha a referência global ao fechar a janela
+        self.window.protocol("WM_DELETE_WINDOW", self.close_window)
+
+        # Thread para receber mensagens
+        self.receive_thread = threading.Thread(target=self.receber_mensagens, daemon=True)
+        self.receive_thread.start()
+
+    def receber_mensagens(self):
+        while self.running:
+            try:
+                resposta = self.client_socket.recv(1024).decode('utf-8')
+                if not resposta:
+                    break
+                if resposta.startswith("Chat "):
+                    resposta = resposta[5:]
+                self.chat_log.config(state='normal')
+                self.chat_log.insert(tk.END, f"Servidor: {resposta}\n")
+                self.chat_log.config(state='disabled')
+                if resposta.lower().startswith("sair"):
+                    break
+            except Exception:
+                break
+        self.close_window()
+
     def send_message(self, event):
         mensagem = self.chat_entry.get()
-        self.client_socket.send(f"Chat {mensagem}".encode('utf-8'))
-        self.chat_log.config(state='normal')
-        self.chat_log.insert(tk.END, f"Você: {mensagem}\n")
-        self.chat_log.config(state='disabled')
-        self.chat_entry.delete(0, tk.END)
-        if mensagem.lower() == 'sair':
-            self.client_socket.send("Sair".encode('utf-8'))
+        if not mensagem.strip():
+            return
+        try:
+            # Sempre envie com delimitador \n
+            self.client_socket.send(f"Chat {mensagem}\n".encode('utf-8'))
+            self.chat_log.config(state='normal')
+            self.chat_log.insert(tk.END, f"Você: {mensagem}\n")
+            self.chat_log.config(state='disabled')
+            self.chat_entry.delete(0, tk.END)
+            if mensagem.lower() == 'sair':
+                self.client_socket.send("Sair\n".encode('utf-8'))
+                self.running = False
+                self.close_window()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao enviar mensagem: {e}")
+
+    def close_window(self):
+        self.running = False
+        try:
             self.window.destroy()
+        except Exception:
+            pass
+        if hasattr(iniciar_chat, 'chat_window'):
+            iniciar_chat.chat_window = None
+
+# Função para iniciar o chat (garante só uma janela)
+def iniciar_chat(client_socket):
+    global root
+    if hasattr(iniciar_chat, 'chat_window') and iniciar_chat.chat_window is not None:
+        try:
+            if iniciar_chat.chat_window.window.winfo_exists():
+                iniciar_chat.chat_window.window.lift()
+                return
+        except Exception:
+            pass
+    iniciar_chat.chat_window = ChatWindow(client_socket, root)
 
 def handle_arquivo(client_socket):
     # Nova interface: seleção de arquivo

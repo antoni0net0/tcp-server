@@ -18,28 +18,33 @@ def handle_client(client_socket, client_address):
     print(f"Conexão de {client_address} estabelecida.")
     chat_window = None
 
+    buffer = ""
     while True:
         try:
-            request = client_socket.recv(1024).decode('utf-8')
-
-            if not request:
+            data = client_socket.recv(1024).decode('utf-8')
+            if not data:
                 break
-
-            if request.startswith("Sair"):
-                print(f"Cliente {client_address} desconectado.")
-                break
-
-            elif request.startswith("Arquivo"):
-                parts = request.split(' ', 1)
-                threading.Thread(target=send_archive, args=(parts, client_socket, client_address)).start()
-                            
-            elif request.startswith("Chat"):
-                if not chat_window:
-                    chat_window = ChatWindow(server_root, client_socket, client_address)
-                # Exibe a mensagem recebida na janela do chat
-                chat_window.display_message(f"Cliente: {request[5:]}\n")
-                # Não envie de volta para o cliente aqui!
-                    
+            buffer += data
+            while '\n' in buffer:
+                request, buffer = buffer.split('\n', 1)
+                if not request:
+                    continue
+                if request.startswith("Sair"):
+                    print(f"Cliente {client_address} desconectado.")
+                    return
+                elif request.startswith("Arquivo"):
+                    parts = request.split(' ', 1)
+                    threading.Thread(target=send_archive, args=(parts, client_socket, client_address)).start()
+                elif request.startswith("Chat"):
+                    if not chat_window:
+                        chat_window = ChatWindow(server_root, client_socket, client_address)
+                    # Exibe a mensagem recebida na janela do chat
+                    chat_window.display_message(f"Cliente: {request[5:]}\n")
+                    # Também exibe no log principal do servidor:
+                    broadcast_log.config(state='normal')
+                    broadcast_log.insert(tk.END, f"[Chat] {client_address}: {request[5:]}\n")
+                    broadcast_log.config(state='disabled')
+                    broadcast_log.see(tk.END)
         except ConnectionResetError:
             print(f"Conexão com {client_address} foi perdida.")
             break
@@ -90,9 +95,7 @@ class ChatWindow:
         self.chat_entry.pack()
         self.chat_entry.bind("<Return>", self.send_message)
 
-        # Thread para ouvir mensagens do cliente
-        self.listen_thread = threading.Thread(target=self.listen_for_messages, daemon=True)
-        self.listen_thread.start()
+        # Não crie thread para ouvir mensagens aqui! Tudo será tratado no handle_client
 
     def display_message(self, message):
         # Garante que a atualização do chat_log ocorra na thread principal do Tkinter
@@ -117,20 +120,7 @@ class ChatWindow:
             self.running = False
             self.window.destroy()
 
-    def listen_for_messages(self):
-        while self.running:
-            try:
-                data = self.client_socket.recv(1024).decode('utf-8')
-                if data.startswith("Chat "):
-                    mensagem = data[5:]
-                    self.display_message(f"Cliente: {mensagem}\n")
-                elif data.startswith("Sair"):
-                    self.display_message("Cliente saiu do chat.\n")
-                    self.running = False
-                    self.window.destroy()
-                    break
-            except Exception:
-                break
+    # Removido: a leitura do socket é feita apenas no handle_client
 
     def close_window(self):
         self.running = False
