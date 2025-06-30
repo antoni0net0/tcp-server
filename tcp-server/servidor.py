@@ -129,8 +129,6 @@ class ChatWindow:
             self.running = False
             self.window.destroy()
 
-    # Removido: a leitura do socket é feita apenas no handle_client
-
     def close_window(self):
         self.running = False
         self.window.destroy()
