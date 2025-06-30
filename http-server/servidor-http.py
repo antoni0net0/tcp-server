@@ -3,7 +3,7 @@ import threading
 import os
 
 HOST = '127.0.0.1'
-PORT = 8080  # Porta acima de 1024
+PORT = 8080
 
 def handle_client(conn, addr):
     try:
