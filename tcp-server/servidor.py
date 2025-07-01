@@ -25,34 +25,37 @@ def handle_client(client_socket, client_address):
     buffer = ""
     while True:
         try:
-            data = client_socket.recv(1024).decode('utf-8')
-            if not data:
-                break
-            buffer += data
-            while '\n' in buffer:
-                request, buffer = buffer.split('\n', 1)
-                if not request:
-                    continue
-                if request.startswith("Sair"):
-                    print(f"Cliente {client_address} desconectado.")
-                    if client_address in chat_windows:
-                        chat_windows[client_address].display_message("Cliente saiu do chat.\n")
-                        chat_windows[client_address].close_window()
-                        del chat_windows[client_address]
-                    return
-                elif request.startswith("Arquivo"):
-                    parts = request.split(' ', 1)
-                    threading.Thread(target=send_archive, args=(parts, client_socket, client_address)).start()
-                elif request.startswith("Chat"):
-                    if client_address not in chat_windows:
-                        chat_windows[client_address] = ChatWindow(server_root, client_socket, client_address)
-                    # Exibe a mensagem recebida na janela do chat
-                    chat_windows[client_address].display_message(f"Cliente: {request[5:]}\n")
-                    # Também exibe no log principal do servidor:
-                    broadcast_log.config(state='normal')
-                    broadcast_log.insert(tk.END, f"[Chat] {client_address}: {request[5:]}\n")
-                    broadcast_log.config(state='disabled')
-                    broadcast_log.see(tk.END)
+            request = client_socket.recv(1024).decode('utf-8')
+
+            #data = client_socket.recv(1024).decode('utf-8')
+            #if not data:
+            #    break
+            #buffer += data
+            #while '\n' in buffer:
+            #request, buffer = buffer.split('\n', 1)
+            if not request:
+                continue
+            if request.startswith("Sair"):
+                print(f"Cliente {client_address} desconectado.")
+                if client_address in chat_windows:
+                    chat_windows[client_address].display_message("Cliente saiu do chat.\n")
+                    chat_windows[client_address].close_window()
+                    del chat_windows[client_address]
+                return
+            elif request.startswith("Arquivo"):
+                parts = request.split(' ', 1)
+                threading.Thread(target=send_archive,args=(parts, client_socket, client_address)).start() ##vou retirar o args= e passar direto para a função
+                #send_archive(parts,client_socket,client_address)
+            elif request.startswith("Chat"):
+                if client_address not in chat_windows:
+                    chat_windows[client_address] = ChatWindow(server_root, client_socket, client_address)
+                # Exibe a mensagem recebida na janela do chat
+                chat_windows[client_address].display_message(f"Cliente: {request[5:]}\n")
+                # Também exibe no log principal do servidor:
+                broadcast_log.config(state='normal')
+                broadcast_log.insert(tk.END, f"[Chat] {client_address}: {request[5:]}\n")
+                broadcast_log.config(state='disabled')
+                broadcast_log.see(tk.END)
         except ConnectionResetError:
             print(f"Conexão com {client_address} foi perdida.")
             break
@@ -62,8 +65,9 @@ def handle_client(client_socket, client_address):
     if client_address in chat_windows:
         chat_windows[client_address].close_window()
         del chat_windows[client_address]
+        
 def send_archive(parts, client_socket, client_address):
-    if len(parts) == 2:
+    if len(parts) == 2: ##aqui era dois mas me pareceu meio estranho AUGUSTO
         nome_arquivo = parts[1]
         if os.path.exists(nome_arquivo):
             tamanho_arquivo = os.path.getsize(nome_arquivo)
